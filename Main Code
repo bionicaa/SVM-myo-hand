@@ -1,0 +1,138 @@
+%Linear SVM Classifier (Amin Abdi)
+
+%Run steps 1, 3, 4, 9
+%Repeat but now run steps 1, 2, 7, 3, 4, 5, 6, 8
+% in that order
+
+%Step 1
+
+%connect to arduino board
+a = arduino('COM3','Uno','Libraries','Servo');
+%connect motor
+M = servo(a,'D5');
+
+ %%
+
+%Step 2
+
+%prediction of new data, only run after SVM is run. 
+
+%read force sensor output
+f = readVoltage(a,'A2');
+%input weight of object
+w = input('What is the weight of the object being manipulated?');
+
+%%
+
+%Step 3
+
+%import training dataset
+tr_data = csvread('training_data.csv');
+
+%prepare data
+x1 = tr_data(:,2); %column 2 - sensor output
+y1 = tr_data(:,1); %column 1 - weight of object
+sz = 30; %size of data plots
+
+%plot the training data for visualization
+figure
+scatter(x1,y1,sz,'filled')
+title('Visualization of Training data')
+xlabel('Sensor Output')
+ylabel('Weight (g)')
+
+%%
+
+%Step 4
+
+%fit model
+
+X = [x1,y1]; %predictors
+Y = tr_data(:,3);
+
+SVM = fitcsvm(X,Y);
+
+%design hyperplane
+w1 = (SVM.Alpha' * SVM.SupportVectors(:,1));
+w2 = (SVM.Alpha' * SVM.SupportVectors(:,2));
+bias = SVM.Bias;
+a = -w1/w2; %gradient
+b = -SVM.Bias/w2; %margin
+
+h = a*X + b; %y=mx+c
+
+%visualize SVM with decision boundary
+figure
+scatter(tr_data(:,2),tr_data(:,1),'bo','filled' );
+hold on
+plot(h,'g','MarkerSize',10);
+hold on
+xlim([0 8])
+title('SVM classifier')
+xlabel('Sensor Output')
+ylabel('Weight (g)')
+hold off
+
+%%
+
+%Step 5
+
+%predict new case
+n_data = [w, f]; 
+label = predict(SVM,n_data);
+disp(label)
+%%
+
+%Step 6
+
+%visualise to determine correct classification
+figure 
+scatter(tr_data(:,2),tr_data(:,1),'bo','filled');
+hold on
+plot(h,'g','MarkerSize',10);
+hold on
+scatter(n_data(:,2),n_data(:,1),'r','filled');
+hold on
+title('SVM classifier')
+xlabel('Sensor Output')
+ylabel('Weight (g)')
+hold off
+
+%%
+
+%Step 7
+
+EMG = readVoltage(a,'A0');%read EMG output
+thresh = 0.5;
+%threshold is reached when muscles are contracted
+%while thresh reached
+
+%%
+
+%Step 8
+
+%operate motor
+while EMG > thresh
+    if label == 0  %if Soft, turn servo 90 degrees
+        for angle = 0:0.2:1
+            writePosititon(M, angle);
+            current_pos = readPosition(M);
+            current_pos = current_pos*90;
+            pause(5);
+        end
+    end
+    if label == 1  %if Hard, turn servo 180 degrees
+        for angle = 0:0.2:1
+            writePosititon(M, angle);
+            current_pos = readPosition(M);
+            current_pos = current_pos*180;
+            pause(5);
+        end 
+    end
+end
+writePosition(M,0);
+
+%%
+
+%Step 9
+clear all
